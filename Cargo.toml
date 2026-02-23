@@ -19,6 +19,7 @@ thiserror = "2.0.18"
 anyhow = "1.0.102"
 dotenvy = "0.15.7"
 rig-core = "0.31.0"
+rust_decimal = { version = "1.40.0", features = ["serde-with-str"]}
 # TODO: Add Teloxide, Coloured
 
 
