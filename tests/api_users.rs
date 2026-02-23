@@ -1,6 +1,6 @@
 mod common;
 
-use callipsos_core::db::user::User;
+use callipsos_core::db::user::{User, UserId};
 use uuid::Uuid;
 
 #[tokio::test]
@@ -11,7 +11,7 @@ async fn create_user_without_telegram_id() {
         .await
         .expect("Failed to create user");
 
-    assert_ne!(user.id, Uuid::nil());
+    assert_ne!(user.id, UserId::from(Uuid::new_v4()));
     assert!(user.telegram_id.is_none());
     assert!(user.wallet_address.is_none());
     assert!(user.created_at <= chrono::Utc::now());
@@ -50,7 +50,7 @@ async fn find_user_by_id() {
 async fn find_user_by_nonexistent_id() {
     let app = common::spawn_app().await;
 
-    let found = User::find_by_id(&app.db, Uuid::new_v4())
+    let found = User::find_by_id(&app.db, UserId::from(Uuid::new_v4()))
         .await
         .expect("Failed to query user");
 

@@ -27,3 +27,5 @@ target
 
 # ENV File
 .env
+
+.vscode
