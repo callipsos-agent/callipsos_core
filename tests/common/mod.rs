@@ -22,6 +22,10 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to run migrations");
 
+    sqlx::query("DELETE FROM transaction_log").execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM policies").execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM users").execute(&pool).await.unwrap();
+
     let state = AppState { db: pool.clone() };
     let app = routes::create_router(state);
 

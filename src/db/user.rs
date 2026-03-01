@@ -1,36 +1,14 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
-use std::fmt;
-use std::ops::Deref;
+
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::policy::types::UserId;
 
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize)]
-#[sqlx(transparent)]
-pub struct UserId(pub Uuid);
-
-impl Deref for UserId {
-    type Target = Uuid;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for UserId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl From<Uuid> for UserId {
-    fn from(id: Uuid) -> Self {
-        Self(id)
-    }
-}
 
 // ── User model ──────────────────────────────────────────────
 
@@ -45,7 +23,7 @@ pub struct User {
 
 impl User {
     pub async fn create(pool: &PgPool, telegram_id: Option<i64>) -> Result<User, AppError> {
-        let id = Uuid::new_v4();
+        let id = UserId::from(Uuid::new_v4());
 
         let user = sqlx::query_as!(
             User,
@@ -59,7 +37,7 @@ impl User {
                 created_at,
                 updated_at
             "#,
-            id,
+            id.0,
             telegram_id
         )
         .fetch_one(pool)

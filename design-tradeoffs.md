@@ -16,6 +16,8 @@ Tradeoffs made during Phase 1 to keep scope tight. Revisit these in later phases
 | **Transaction calldata decoding** | `target_protocol` is declared intent from the agent, so we trust the request fields | Decode raw calldata with alloy `sol!` macro, verify target contract is actually the claimed protocol | Phase 2 adds alloy-rs. The policy engine doesn't change, only the validate route gets smarter about where `TransactionRequest` fields come from. |
 | **`audited_protocols` as `HashSet`** | `Vec<ProtocolId>` with `.contains()` | Switch to `HashSet<ProtocolId>` for O(1) lookups | We have 3 protocols. O(n) on n=3 is not a bottleneck. Revisit when the allowlist grows past ~20. |
 | **Transaction simulation** | No simulation. Policy engine approves/blocks based on rules only. | Add `eth_call` simulation via alloy provider on Base to preview transaction outcomes before execution. | Simulation requires an RPC connection and alloy. Not needed to prove the policy engine works. |
+| **`ReallocationDeltaTooSmall` in `policy/rules`** | TODO: | Add as a policy rule for rate chasing logic | Will come in handy when designing the DeFi agents to prevent agent from churning.
+| **`Money` arithmetic in `policy/types`** | Can add basic arithmetic ops for the engine | We'll design the tests first, then add ops when the test demands it | Currently not needed will check back.
 
 ### Deferred to Phase 3+
 
@@ -71,3 +73,4 @@ _Tradeoffs that only matter at scale. Don't touch these until product-market fit
 | Single-crate Rust → workspace with sub-crates | Module boundaries get painful | Codebase exceeds ~5k lines |
 | PostgreSQL → read replicas or caching layer | DB becomes bottleneck on validate endpoint | Sustained >1k req/s |
 | Hardcoded yield sources → general yield aggregator | Users want protocols beyond Aave + Moonwell | User feedback demands it |
+| Add `MaxPositionsExceeded` Violation in `policy/types`  → A cap on simultaneous positions a user can have | Users want Vaults and LPs | User feedback demands it |

@@ -1,6 +1,7 @@
 mod common;
 
-use callipsos_core::db::user::{User, UserId};
+use callipsos_core::db::user::User;
+use callipsos_core::policy::types::UserId;
 use uuid::Uuid;
 
 #[tokio::test]
