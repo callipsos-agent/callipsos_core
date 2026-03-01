@@ -246,10 +246,15 @@ pub enum RiskScoreError {
 pub enum RuleId {
     MaxTransactionAmount,
     MaxPercentPerProtocol,
+    MaxPercentPerAsset,
     OnlyAuditedProtocols,
     AllowedProtocols,
     BlockedActions,
     MaxDailySpend,
+    MinRiskScore,
+    MaxProtocolUtilization,
+    MinProtocolTvl,
+
 }
 
 impl fmt::Display for RuleId {
@@ -257,10 +262,14 @@ impl fmt::Display for RuleId {
         let s = match self {
             RuleId::MaxTransactionAmount => "max_transaction_amount",
             RuleId::MaxPercentPerProtocol => "max_percent_per_protocol",
+            RuleId::MaxPercentPerAsset => "max_percent_per_asset",
             RuleId::OnlyAuditedProtocols => "only_audited_protocols",
             RuleId::AllowedProtocols => "allowed_protocols",
             RuleId::BlockedActions => "blocked_actions",
             RuleId::MaxDailySpend => "max_daily_spend",
+            RuleId::MinRiskScore => "min_risk_score",
+            RuleId::MaxProtocolUtilization => "max_protocol_utilization",
+            RuleId::MinProtocolTvl => "min_protocol_tvl"
         };
         write!(f, "{s}")
     }
