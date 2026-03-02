@@ -450,6 +450,9 @@ impl RuleResult {
 
 // ── TransactionRequest ──────────────────────────────────────
 
+// TODO (Cyndie): For Action::Swap, add asset_in and asset_out fields.
+// Current single-asset model only works for Supply/Withdraw/Stake.
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionRequest {
     pub user_id: UserId,
