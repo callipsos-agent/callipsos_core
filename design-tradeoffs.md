@@ -18,6 +18,9 @@ Tradeoffs made during Phase 1 to keep scope tight. Revisit these in later phases
 | **Transaction simulation** | No simulation. Policy engine approves/blocks based on rules only. | Add `eth_call` simulation via alloy provider on Base to preview transaction outcomes before execution. | Simulation requires an RPC connection and alloy. Not needed to prove the policy engine works. |
 | **`ReallocationDeltaTooSmall` in `policy/rules`** | TODO: | Add as a policy rule for rate chasing logic | Will come in handy when designing the DeFi agents to prevent agent from churning.
 | **`Money` arithmetic in `policy/types`** | Can add basic arithmetic ops for the engine | We'll design the tests first, then add ops when the test demands it | Currently not needed will check back.
+|**Action-aware rule filtering** | All rules run for all actions. Math assumes additive (Supply)| Engine filters which rules apply by action type. Withdraw/Transfer skip exposure and spend rules | MVP only supports Supply on Aave/Moonwell. Other actions exist in the enum for forward-compatibility
+|**Single-asset `TransactionRequest`** | One `asset:AssetSymbol` field. Works for Supply/Withdraw/Stake.| Add `asset_in` and `asset_out` for `Action::Swap`. `MaxPercentPerAsset` evaluates both sides.| Swaps aren't in MVP scope. Calldata decoding in Phase 2 is when swap fields become meaningful.
+
 
 ### Deferred to Phase 3+
 

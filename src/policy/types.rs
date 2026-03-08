@@ -123,6 +123,10 @@ impl Money {
         Self(Decimal::ZERO)
     }
 
+    pub fn is_zero(&self) -> bool {
+    self.0.is_zero()
+    }
+
     pub fn inner(&self) -> Decimal {
         self.0
     }
@@ -446,6 +450,9 @@ impl RuleResult {
 
 // ── TransactionRequest ──────────────────────────────────────
 
+// TODO (Cyndie): For Action::Swap, add asset_in and asset_out fields.
+// Current single-asset model only works for Supply/Withdraw/Stake.
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionRequest {
     pub user_id: UserId,
@@ -463,6 +470,7 @@ pub struct TransactionRequest {
 pub struct EvaluationContext {
     pub portfolio_total_usd: Money,
     pub current_protocol_exposure_usd: Money,
+    pub current_asset_exposure_usd: Money,
     pub daily_spend_usd: Money,
     pub audited_protocols: Vec<ProtocolId>,
     pub protocol_risk_score: Option<RiskScore>,
