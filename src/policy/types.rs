@@ -478,6 +478,23 @@ pub struct EvaluationContext {
     pub protocol_tvl: Option<Money>,
 }
 
+// ── EngineReason ────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EngineReason {
+    NoPoliciesConfigured,
+}
+
+impl fmt::Display for EngineReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EngineReason::NoPoliciesConfigured => {
+                write!(f, "no policies configured — set policies before transacting")
+            }
+        }
+    }
+}
+
 // ── Decision + PolicyVerdict ────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -490,9 +507,17 @@ pub enum Decision {
 pub struct PolicyVerdict {
     pub decision: Decision,
     pub results: Vec<RuleResult>,
+    pub engine_reason: Option<EngineReason>,
 }
 
 impl PolicyVerdict {
+    pub fn blocked_by_engine(reason: EngineReason) -> Self {
+        Self {
+            decision: Decision::Blocked,
+            results: vec![],
+            engine_reason: Some(reason),
+        }
+    }
     /// Returns results where outcome is Fail or Indeterminate.
     /// Includes indeterminate results because the safe default is to treat
     /// inability to evaluate as a failure.
@@ -504,8 +529,3 @@ impl PolicyVerdict {
     }
 }
 
-// TODO (Cyndie): Decision rules:
-// - If any Fail → Blocked
-// - Else if any Indeterminate → Blocked (safe default)
-// - Else → Approved
-// This is to be implemented when we get to the engine.
