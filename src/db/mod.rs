@@ -1,5 +1,6 @@
 pub mod user;
 pub mod policy;
+pub mod transaction_log;
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;

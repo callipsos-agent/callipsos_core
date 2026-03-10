@@ -57,3 +57,73 @@ async fn find_user_by_nonexistent_id() {
 
     assert!(found.is_none());
 }
+
+// ── HTTP route tests ────────────────────────────────────────
+
+#[tokio::test]
+async fn route_create_user_returns_201() {
+    let app = common::spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post(format!("{}/api/v1/users", app.addr))
+        .json(&serde_json::json!({ "telegram_id": 111222333 }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 201);
+
+    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    assert_eq!(body["telegram_id"], 111222333);
+    assert!(body["id"].is_string());
+    assert!(body["wallet_address"].is_null());
+    assert!(body["created_at"].is_string());
+    assert!(body["updated_at"].is_string());
+}
+
+#[tokio::test]
+async fn route_create_user_without_telegram_id_returns_201() {
+    let app = common::spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post(format!("{}/api/v1/users", app.addr))
+        .json(&serde_json::json!({}))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 201);
+
+    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    assert!(body["id"].is_string());
+    assert!(body["telegram_id"].is_null());
+}
+
+#[tokio::test]
+async fn route_duplicate_telegram_id_returns_409() {
+    let app = common::spawn_app().await;
+    let client = reqwest::Client::new();
+
+    // First create succeeds
+    let response = client
+        .post(format!("{}/api/v1/users", app.addr))
+        .json(&serde_json::json!({ "telegram_id": 444555666 }))
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(response.status(), 201);
+
+    // Second create with same telegram_id → 409
+    let response = client
+        .post(format!("{}/api/v1/users", app.addr))
+        .json(&serde_json::json!({ "telegram_id": 444555666 }))
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(response.status(), 409);
+
+    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    assert!(body["error"].is_string());
+}

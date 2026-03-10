@@ -247,6 +247,7 @@ pub enum RiskScoreError {
 // ── RuleId ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RuleId {
     MaxTransactionAmount,
     MaxPercentPerProtocol,
@@ -389,6 +390,7 @@ impl fmt::Display for Violation {
 // ── RuleOutcome + RuleResult ────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RuleOutcome {
     Pass,
     Fail,
@@ -481,6 +483,7 @@ pub struct EvaluationContext {
 // ── EngineReason ────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EngineReason {
     NoPoliciesConfigured,
 }
@@ -498,6 +501,7 @@ impl fmt::Display for EngineReason {
 // ── Decision + PolicyVerdict ────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Decision {
     Approved,
     Blocked,
