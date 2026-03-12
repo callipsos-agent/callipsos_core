@@ -29,3 +29,7 @@ target
 .env
 
 .vscode
+node_modules/
+
+# Lit Auth Storage File
+lit-auth-storage/
