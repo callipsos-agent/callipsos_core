@@ -5,10 +5,14 @@ pub mod validate;
 
 use axum::{routing::{get,post, delete}, Router};
 use sqlx::PgPool;
+use std::sync::Arc;
+
+use crate::signing::SigningProvider;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    pub signing_provider: Option<Arc<dyn SigningProvider>>,
 }
 
 pub fn create_router(state: AppState) -> Router {

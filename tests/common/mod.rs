@@ -9,6 +9,7 @@ pub struct TestApp {
 }
 
 /// Spawns the app on a random port with a real test database.
+/// Note! Signing is disabled (None) for integration tests.
 pub async fn spawn_app() -> TestApp {
     dotenvy::dotenv().ok();
 
@@ -26,7 +27,10 @@ pub async fn spawn_app() -> TestApp {
     sqlx::query("DELETE FROM policies").execute(&pool).await.unwrap();
     sqlx::query("DELETE FROM users").execute(&pool).await.unwrap();
 
-    let state = AppState { db: pool.clone() };
+    let state = AppState {
+        db: pool.clone(),
+        signing_provider: None,
+    };
     let app = routes::create_router(state);
 
     // Port 0 → OS assigns random available port

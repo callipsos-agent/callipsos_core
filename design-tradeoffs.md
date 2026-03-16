@@ -55,7 +55,34 @@ _To be filled as we build Phase 2._
 | Tradeoff | What we chose | What to revisit | Why |
 |---|---|---|---|
 
----
+## Phase 2: Validation Pipeline + Signing (13/03/2026)
+
+Tradeoffs made during Phase 2 for Lit Protocol integration and API completion.
+
+### Deferred to Phase 3+
+
+| Tradeoff | What we did (Phase 2) | What to do later | Why we deferred |
+|---|---|---|---|
+| **Lit Action code inline vs IPFS** | Send Lit Action JS code inline with every `/core/v1/lit_action` request | Pin to IPFS and reference by CID for immutability guarantees. Register CID in Chipotle group for tighter scoping. | Inline is simpler and avoids IPFS availability dependency. For production, pinned CID proves to users the signing logic hasn't changed. |
+| **Placeholder tx hash** | Generate `0x{uuid}` as stand-in tx hash for signing | Sign actual transaction calldata hash once alloy-rs calldata decoding lands | No real on-chain transactions yet. The signing flow works the same — real hash is just a different input. |
+| **`signer_address` not populated** | `SigningResult.signer_address` is always `None` | Derive PKP address from public key and include in response | Address derivation requires keccak256 of the uncompressed public key. Not needed for demo — the signature itself proves the PKP signed. |
+| **Signing failure is silent** | If Lit API fails, log a warning and return verdict without signature. `signing: null` in response. | Surface signing errors to caller via a `signing_error` field or separate status | For MVP, the policy decision is the priority. Signing is additive. Don't let Lit downtime break the validate endpoint. |
+| **No retry on Lit API failure** | Single attempt, fail-open (verdict still returned) | Add retry with backoff for transient Lit API errors | Complexity not justified for MVP. Chipotle dev network may have occasional downtime. |
+| **Risk score float precision** | `protocol_risk_score` arrives as f64, converted via `Decimal::from_f64_retain` which produces long decimals (e.g. `0.4000000000000000222044604924`) | Accept risk score as string (like money fields) or round after conversion | Display is correct (rounds to 2dp), only the raw serialized violation shows the noise. Cosmetic issue, not a correctness issue. |
+| **Naga → Chipotle migration** | Built directly on Chipotle (Lit v3) REST API. No Naga code exists. | Move to Chipotle production when it launches (~March 25) | Naga is sunsetting April 1. Chipotle dev is live and working. Swap `LIT_API_URL` to production endpoint when available. |
+| **No IPFS CID scoping in Chipotle group** | Group has "all actions permitted" flag for simplicity | Register specific IPFS CID in group, scope usage API key to only that action | Tighter security for production. MVP uses inline code so CID scoping doesn't apply yet. |
+| **Express sidecar eliminated** | Call Chipotle REST API directly from Rust via reqwest. No `lit-signer/` TS service. | N/A — this is the final architecture | Chipotle's REST API made the sidecar unnecessary. Fewer moving parts, one language, one process. |
+
+### Decisions we're keeping
+
+| Decision | Why it's right |
+|---|---|
+| **`SigningProvider` trait abstraction** | `LitSigningProvider` today, could swap to any other signing backend (ZeroDev, Ika, local HSM) without touching the validate route. Trait takes `&PolicyVerdict` + tx hash, returns `SigningResult`. |
+| **Signing is optional (`Option<Arc<dyn SigningProvider>>`)** | Server starts and works without Lit configured. All Phase 1 tests pass with `signing_provider: None`. No env vars required for development. |
+| **Signing only on approved verdicts** | Blocked verdicts never touch the Lit API. The PKP physically cannot sign a transaction that Callipsos rejected. This is the core security guarantee. |
+| **Lit Action double-checks the verdict** | The Lit Action independently verifies `decision === 'approved'` and no failed rules before signing. Belt-and-suspenders — even if the Rust code has a bug, the TEE won't sign a bad verdict. |
+| **`ValidateResponse` uses `#[serde(flatten)]` on `PolicyVerdict`** | Keeps the existing `decision`, `results`, `engine_reason` fields at the top level. Adding `signing` alongside them is non-breaking — Phase 1 consumers see the same shape plus a new nullable field. |
+| **Inline Lit Action code over IPFS** | Matches how Chipotle's own SDK (`litAction` method) sends code. Avoids IPFS pinning setup, gateway availability issues, and extra dashboard config. Code is ~30 lines and deterministic. |
 
 ## Phase 3: AI Layer + Conversational Interface
 

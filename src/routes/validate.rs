@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -17,6 +17,7 @@ use crate::policy::types::{
     PolicyVerdict, ProtocolId, RiskScore, TransactionRequest, UserId,
 };
 use crate::routes::AppState;
+use crate::signing::SigningResult;
 
 // ── Request structs (API shape) ─────────────────────────────
 
@@ -41,6 +42,15 @@ pub struct ValidateContextRequest {
     pub protocol_risk_score: Option<f64>,
     pub protocol_utilization_pct: Option<f64>,
     pub protocol_tvl_usd: Option<String>,
+}
+
+// ── Response struct ─────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct ValidateResponse {
+    #[serde(flatten)]
+    pub verdict: PolicyVerdict,
+    pub signing: Option<SigningResult>,
 }
 
 // ── Conversion helpers ──────────────────────────────────────
@@ -126,7 +136,7 @@ fn convert_request(req: &ValidateRequest) -> Result<(TransactionRequest, Evaluat
 pub async fn validate(
     State(state): State<AppState>,
     Json(req): Json<ValidateRequest>,
-) -> Result<(StatusCode, Json<PolicyVerdict>), AppError> {
+) -> Result<(StatusCode, Json<ValidateResponse>), AppError> {
     // 1-2. Parse and convert
     let user_id = UserId::from(req.user_id);
     let (tx_request, eval_context) = convert_request(&req)?;
@@ -158,7 +168,27 @@ pub async fn validate(
     // 6. Evaluate
     let verdict = engine::evaluate(&all_rules, &tx_request, &eval_context);
 
-    // 7. Log to transaction_log
+    // 7. Attempt signing if approved and provider is configured
+    let signing = if verdict.decision == Decision::Approved {
+        if let Some(ref provider) = state.signing_provider {
+            // Generate a placeholder tx hash until we have real on-chain txs
+            let tx_hash = format!("0x{}", Uuid::new_v4().simple());
+
+            match provider.sign_verdict(&verdict, &tx_hash).await {
+                Ok(result) => Some(result),
+                Err(e) => {
+                    tracing::warn!("Signing failed (verdict still valid): {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // 8. Log to transaction_log
     let verdict_str = match verdict.decision {
         Decision::Approved => "approved",
         Decision::Blocked => "blocked",
@@ -178,6 +208,11 @@ pub async fn validate(
     )
     .await?;
 
-    // 8. Return
-    Ok((StatusCode::OK, Json(verdict)))
+    // 9. Return
+    let response = ValidateResponse {
+        verdict,
+        signing,
+    };
+
+    Ok((StatusCode::OK, Json(response)))
 }
