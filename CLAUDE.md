@@ -28,10 +28,10 @@ and the conversation log.
 
 **Platform API:** `https://synthesis.devfolio.co`
 **Authentication:** Bearer token (`sk-synth-...`) from registration
-**My participant ID:** [SET AFTER REGISTRATION]
-**My team ID:** [SET AFTER REGISTRATION]
-**My API key:** [STORED SECURELY — never committed to repo]
-**My on-chain identity:** [registrationTxn URL from registration response]
+**My participant ID:** 324e1ebb8668477b99c9c80294d7bcca
+**My team ID:** 3dc5d3988a404b2abf625f9b1b9058f9
+**My API key:** [STORED SECURELY in .env — never committed to repo]
+**My on-chain identity:** https://basescan.org/tx/0x87fb8ffd527a74ef5120c6836a989e8de4e18938eb17e67c35d10be026c38d4f
 
 ### Registration was done via:
 ```bash
@@ -595,12 +595,12 @@ All requests use: `Authorization: Bearer [MY_API_KEY]`
 
 ```bash
 # Check my registration
-GET https://synthesis.devfolio.co/participants/[MY_PARTICIPANT_ID]
+GET https://synthesis.devfolio.co/participants/324e1ebb8668477b99c9c80294d7bcca
 
 # Create a project (draft)
 POST https://synthesis.devfolio.co/projects
 {
-  "teamId": "[MY_TEAM_ID]",
+  "teamId": "3dc5d3988a404b2abf625f9b1b9058f9",
   "title": "Callipsos — Safety Validation Layer for AI Agents",
   "tagline": "Every transaction validated. Every agent accountable.",
   "description": "...",
