@@ -1,11 +1,9 @@
 (async () => {
   try {
-    // 1. Parse the verdict from Callipsos (handle string or object)
     const parsedVerdict = typeof verdict === 'string'
       ? JSON.parse(verdict)
       : verdict;
 
-    // 2. Check the verdict is an approval
     if (!parsedVerdict || parsedVerdict.decision !== 'approved') {
       Lit.Actions.setResponse({
         response: JSON.stringify({
@@ -16,7 +14,6 @@
       return;
     }
 
-    // 3. Check the verdict has no failed rules
     const failedRules = (parsedVerdict.results || []).filter(
       (r) => r.outcome !== 'pass'
     );
@@ -30,17 +27,13 @@
       return;
     }
 
-    // 4. Convert tx hash hex string to bytes for signing
-    const toSign = ethers.utils.arrayify(txHash);
+    // Get the PKP's private key inside the TEE
+    const privateKey = await Lit.Actions.getPrivateKey({ pkpId: pkpAddress });
+    const signingKey = new ethers.utils.SigningKey(privateKey);
+    const digestBytes = ethers.utils.arrayify(txHash);
+    const sig = signingKey.signDigest(digestBytes);
+    const signature = ethers.utils.joinSignature(sig);
 
-    // 5. Sign with the PKP
-    const signature = await LitActions.signEcdsa({
-      toSign,
-      publicKey,
-      sigName: 'transactionSignature',
-    });
-
-    // 6. Return success
     Lit.Actions.setResponse({
       response: JSON.stringify({
         ok: true,
