@@ -171,9 +171,13 @@ pub async fn validate(
     // 7. Attempt signing if approved and provider is configured
     let signing = if verdict.decision == Decision::Approved {
         if let Some(ref provider) = state.signing_provider {
-            // Generate a placeholder tx hash until we have real on-chain txs
-            let tx_hash = format!("0x{}", Uuid::new_v4().simple());
-
+            // Generate a 32-byte placeholder tx hash for signing.
+            // signEcdsa requires a 32-byte digest; a UUID is only 16 bytes.
+            // Use keccak256(uuid) to produce a valid 32-byte hash.
+            let raw_id = Uuid::new_v4();
+            let hash = alloy::primitives::keccak256(raw_id.as_bytes());
+            let tx_hash = format!("{hash}");
+ 
             match provider.sign_verdict(&verdict, &tx_hash).await {
                 Ok(result) => Some(result),
                 Err(e) => {

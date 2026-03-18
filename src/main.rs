@@ -24,9 +24,9 @@ async fn main() -> anyhow::Result<()> {
     let signing_provider: Option<Arc<dyn SigningProvider>> = {
         let api_url = std::env::var("LIT_API_URL").ok();
         let api_key = std::env::var("LIT_API_KEY").ok();
-        let pkp_public_key = std::env::var("LIT_PKP_PUBLIC_KEY").ok();
+        let pkp_address = std::env::var("LIT_PKP_ADDRESS").ok();
 
-        match (api_url, api_key, pkp_public_key) {
+        match (api_url, api_key, pkp_address) {
             (Some(url), Some(key), Some(pkp)) => {
                 tracing::info!("Lit signing enabled via Chipotle at {}", url);
                 let provider: Arc<dyn SigningProvider> =
@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
                 Some(provider)
             }
             _ => {
-                tracing::info!("Lit signing disabled — set LIT_API_URL, LIT_API_KEY, LIT_PKP_PUBLIC_KEY to enable");
+                tracing::info!("Lit signing disabled — set LIT_API_URL, LIT_API_KEY, LIT_PKP_ADDRESS to enable");
                 None
             }
         }

@@ -14,22 +14,26 @@ use crate::signing::{SigningError, SigningProvider, SigningResult};
 // Auth: X-Api-Key header
 // Body: { "code": "<js string>", "js_params": { ... } }
 //
-// The Lit Action code is sent inline (not via IPFS CID) to avoid
-// IPFS availability issues. The code is ~30 lines and deterministic.
+// The Lit Action code is sent inline with each request.
+// Inside the TEE, it retrieves the PKP's private key via
+// getPrivateKey({ pkpId }), then signs the digest directly
+// with ethers.utils.SigningKey.
+//
+// signEcdsa is gone in Chipotle. The replacement is getPrivateKey —
+// you get the raw key inside the TEE and sign locally with ethers.
 //
 // Setup (one-time via Chipotle Dashboard):
 // 1. Create account → get account API key
 // 2. Create usage API key
-// 3. Create PKP wallet → note public key
-// 4. Create group, add PKP to group
+// 3. Create PKP wallet → note wallet address (this is the pkpId)
 //
 // Environment variables:
 // - LIT_API_URL: Chipotle API base URL (e.g. https://api.dev.litprotocol.com)
 // - LIT_API_KEY: Usage or account API key from Chipotle Dashboard
-// - LIT_PKP_PUBLIC_KEY: PKP public key for signing
+// - LIT_PKP_ADDRESS: PKP wallet address from dashboard (used as pkpId)
 
-/// The Lit Action code that validates a Callipsos verdict and signs if approved.
-/// Sent inline with each request to avoid IPFS dependency.
+/// Lit Action code that validates a Callipsos verdict and signs with the PKP.
+/// Uses the new Chipotle pattern: getPrivateKey + ethers signing inside TEE.
 const LIT_ACTION_CODE: &str = r#"
 (async () => {
   try {
@@ -60,13 +64,12 @@ const LIT_ACTION_CODE: &str = r#"
       return;
     }
 
-    const toSign = ethers.utils.arrayify(txHash);
-
-    const signature = await LitActions.signEcdsa({
-      toSign,
-      publicKey,
-      sigName: 'transactionSignature',
-    });
+    // Get the PKP's private key inside the TEE
+    const privateKey = await Lit.Actions.getPrivateKey({ pkpId: pkpAddress });
+    const signingKey = new ethers.utils.SigningKey(privateKey);
+    const digestBytes = ethers.utils.arrayify(txHash);
+    const sig = signingKey.signDigest(digestBytes);
+    const signature = ethers.utils.joinSignature(sig);
 
     Lit.Actions.setResponse({
       response: JSON.stringify({
@@ -89,7 +92,7 @@ const LIT_ACTION_CODE: &str = r#"
 pub struct LitSigningProvider {
     api_url: String,
     api_key: String,
-    pkp_public_key: String,
+    pkp_address: String,
     client: reqwest::Client,
 }
 
@@ -97,13 +100,16 @@ impl LitSigningProvider {
     pub fn new(
         api_url: String,
         api_key: String,
-        pkp_public_key: String,
+        pkp_address: String,
     ) -> Self {
         Self {
             api_url,
             api_key,
-            pkp_public_key,
-            client: reqwest::Client::new(),
+            pkp_address,
+            client: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::limited(5))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 }
@@ -133,11 +139,10 @@ impl SigningProvider for LitSigningProvider {
         let js_params = json!({
             "verdict": verdict_json,
             "txHash": tx_hash,
-            "publicKey": self.pkp_public_key,
+            "pkpAddress": self.pkp_address,
         });
 
-        // Build the request body matching the Chipotle SDK:
-        // POST /core/v1/lit_action { code, js_params }
+        // Build the request body
         let body = json!({
             "code": LIT_ACTION_CODE,
             "js_params": js_params,
@@ -165,11 +170,13 @@ impl SigningProvider for LitSigningProvider {
             )));
         }
 
-        // Parse Chipotle response: { signatures, response, logs, has_error }
+        // Parse Chipotle response: { response, logs, has_error }
         let resp_json: serde_json::Value = response
             .json()
             .await
             .map_err(|e| SigningError::Internal(format!("Failed to parse Lit response: {e}")))?;
+
+        tracing::debug!("Lit Chipotle raw response: {}", resp_json);
 
         // Check has_error flag
         if resp_json["has_error"].as_bool() == Some(true) {
@@ -178,13 +185,19 @@ impl SigningProvider for LitSigningProvider {
         }
 
         // The Lit Action sets its response via Lit.Actions.setResponse()
-        // Chipotle returns it in the "response" field as a JSON string
-        let action_response_str = resp_json["response"]
-            .as_str()
-            .ok_or_else(|| SigningError::Internal("Missing 'response' field in Lit result".into()))?;
-
-        let action_response: serde_json::Value = serde_json::from_str(action_response_str)
-            .map_err(|e| SigningError::Internal(format!("Failed to parse Lit Action response: {e}")))?;
+        // Chipotle may return it as a JSON string (old) or a nested object (new).
+        let action_response: serde_json::Value = match &resp_json["response"] {
+            serde_json::Value::String(s) => serde_json::from_str(s)
+                .map_err(|e| SigningError::Internal(
+                    format!("Failed to parse Lit Action response string: {e}")
+                ))?,
+            serde_json::Value::Object(_) => resp_json["response"].clone(),
+            other => {
+                return Err(SigningError::Internal(format!(
+                    "Unexpected 'response' field type in Lit result: {other}"
+                )));
+            }
+        };
 
         // Check if the Lit Action reported an error
         if action_response["ok"].as_bool() != Some(true) {
@@ -199,7 +212,7 @@ impl SigningProvider for LitSigningProvider {
         Ok(SigningResult {
             signed: true,
             signature: action_response["signature"].as_str().map(|s| s.to_string()),
-            signer_address: None, // PKP address can be derived from public key if needed
+            signer_address: Some(self.pkp_address.clone()),
             reason: action_response["message"].as_str().map(|s| s.to_string()),
         })
     }
