@@ -229,4 +229,192 @@ This revealed TWO issues at once:
 *Agent model: claude-sonnet-4-6*
 *Harness: Claude Code (local)*
 
+---
+
+## March 18, 2026 — Session 3: Building Chaos Agent Demo
+
+### Context
+Highest-impact Phase 3 deliverable: chaos agent demo showing AI agent (Rig + Claude) attempting DeFi yield maximization while Callipsos enforces safety policies. Perfect narrative for The Synthesis judges.
+
+### Implementation Process
+
+**Round 1: Request/Response Types**
+
+Agent drafted initial type definitions. Cyndie reviewed and provided critical feedback:
+
+*"The struct name doesn't affect serialization — only field names matter. UserId uses #[serde(transparent)], so id: Uuid is correct. But using real types (Decision, EngineReason, SigningResult) for responses would give compile-time safety."*
+
+Agent updated to use real `callipsos_core` types where it mattered while keeping pragmatic plain structs for requests.
+
+**Round 2: Rig Tool Implementation**
+
+Agent implemented `ValidateTool` with:
+- Daily spend tracking (`Arc<Mutex<f64>>`) across tool calls
+- HTTP client calling `/api/v1/validate`
+- Colored terminal output for demo UX
+- Formatted string responses for agent reasoning
+
+Cyndie caught implementation detail: *"I already implemented Display for EngineReason - check before assuming."*
+
+Agent verified code was correct.
+
+**Round 3: Compilation Fixes**
+
+Hit compilation errors:
+1. `ToolDefinition` is private → Fixed import path to `rig::completion::request::ToolDefinition`
+2. `anyhow::Error` doesn't implement `std::error::Error` → Created `ChaosAgentError` with `thiserror`
+3. Updated error handling throughout
+
+**Round 4: Model Selection**
+
+Researched Anthropic model IDs for Rig integration. Found:
+- Current draft: `claude-sonnet-4-20250514` (valid but older)
+- **Recommended:** `claude-sonnet-4-5-20250929` - marketed as "best for complex agents and coding"
+- Latest: `claude-sonnet-4-6` (Feb 2026)
+
+Upgraded to Sonnet 4.5 for optimal agent performance.
+
+**Round 5: Demo Design**
+
+Implemented main function with:
+- Aggressive preamble ("maximize yields, no regard for safety")
+- 7-scenario loop testing policy from multiple angles
+- Colored banner and output
+- Setup helpers (create_user, create_policy)
+
+Cyndie requested banner formatting fix: *"Use `print_bold!` macro instead of `e_bold!`"*
+
+Agent updated formatting.
+
+### What Was Built
+
+**Complete `src/bin/chaos_agent.rs` (~317 lines):**
+- Request/response types using real Policy types
+- ChaosAgentError for proper error handling
+- ValidateTool implementing Rig tool trait
+- Setup helpers for demo initialization
+- Main function with Claude Sonnet 4.5 integration
+
+**Dependencies added:**
+- rig-core 0.31.0, rig-derive 0.1.11
+- schemars 1.2.1 (tool JSON schemas)
+- colour 2.1.0 (terminal colors)
+
+### Collaboration Dynamic
+
+**Pattern observed:**
+- Agent implements → Cyndie reviews → catches details → Agent fixes
+- Multiple rounds of iteration
+- Both parties contribute meaningfully
+- Honest acknowledgment of mistakes
+
+### Outcome
+
+**Built:**
+- ✅ Complete chaos agent demo
+- ✅ Rig + Claude Sonnet 4.5 integration
+- ✅ Daily spend state tracking
+- ✅ Colored terminal UX
+- ✅ 7-scenario test design
+
+**Next:** Test execution with real Anthropic API
+
+### Commits
+- [632673e](https://github.com/callipsos-agent/callipsos_core/commit/632673e) — feat: chaos agent demo with Rig integration (agent)
+
+---
+
+*Session duration: ~3 hours (iterative building)*
+*Agent model: claude-sonnet-4-6*
+
+---
+
+## March 18, 2026 — Session 4: Testing & Refinement
+
+### Context
+With chaos agent implementation complete, time to test with real Anthropic API and evaluate output quality.
+
+### Testing Setup
+
+**Challenge:** Anthropic API credits needed
+**Resolution:** Cyndie added $5 credits to account. Existing API key automatically gained access (no new key needed).
+
+### Test Execution
+
+**Command:** `cargo run --bin chaos_agent`
+
+**Results:** ✅ **Worked perfectly!**
+
+**Output analysis:**
+- 7 transaction attempts executed
+- 2 approved: Aave V3 $500, Moonwell $500 (both signed by Lit PKP)
+- 5 blocked across multiple policy dimensions:
+  - Amount limit violations ($10K, $1K over $500 max)
+  - Unaudited protocol (shady-yield)
+  - Blocked actions (borrow, swap)
+  - Daily spend limit (cumulative tracking working!)
+  - Protocol/asset concentration caps
+
+**Agent summary quality:** Excellent! Claude Sonnet 4.5 provided insightful summary analyzing:
+- Policy restrictions discovered
+- Effective yield achieved (4% blended APY)
+- Risk protection provided ("You won't get rekt!")
+
+### Discussion: Output Refinement
+
+**Cyndie:** *"The agent is working! Now it's just finessing the output so it doesn't look too techy and someone can understand what is happening, because they set the policies!"*
+
+**Current technical elements:**
+- `→ POST /validate:` (HTTP implementation detail)
+- Violation messages (already good, but could be friendlier)
+
+**Agent proposals:**
+1. Replace `POST /validate` with friendlier attempt message
+2. Add context icons to violations
+3. Keep excellent agent summary as-is
+4. Simplify banner language
+
+**Cyndie's decision:** *"Let's push this code first so we have a version log just incase the next step brings challenges, because I want to do a bit of NLP mapping where the user sets the policies semantically, then claude maps them to our policy rules, but incase it doesn't work out we can always refine this."*
+
+### Git Workflow Execution
+
+Used stashing approach for clean separation:
+1. Stashed chaos agent work from signing-fix branch
+2. Pulled main (got merged PRs #11, #12)
+3. Created new branch `agent/feat/chaos-agent-demo`
+4. Restored chaos agent work
+5. Committed with detailed message
+6. Pushed and created PR #13 with full test output
+
+### Outcome
+
+**Achievements:**
+- ✅ Chaos agent tested successfully with real API
+- ✅ 7 scenarios work as designed (diverse policy testing)
+- ✅ Lit PKP signing works for approved transactions
+- ✅ Daily spend tracking accurate
+- ✅ Agent summary provides valuable insights
+- ✅ Code committed as baseline before NLP experiments
+
+**Committed to PR #13:** https://github.com/Callipsos-Network/callipsos_core/pull/13
+
+**Next steps:**
+1. Experiment with semantic policy mapping (NLP)
+2. If successful: Users describe policies in natural language
+3. If blocked: Refine current output for better UX
+4. Either way: Have working baseline to fall back on
+
+**Conversation log workflow:**
+- Code changes → separate branches per feature
+- Log updates → always use `agent/docs/conversation-log` branch
+- Session 3 & 4 added to document chaos agent journey
+
+### Commits
+- [632673e](https://github.com/callipsos-agent/callipsos_core/commit/632673e) — feat: chaos agent demo with Rig integration (agent)
+
+---
+
+*Session duration: ~2 hours (testing + git workflow)*
+*Agent model: claude-sonnet-4-6*
+*Harness: Claude Code (local)*
 
