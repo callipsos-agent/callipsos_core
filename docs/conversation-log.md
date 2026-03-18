@@ -114,3 +114,119 @@ Agent: Acknowledged and committed. This is genuine collaboration — if I see a 
 *Session duration: ~45 minutes*
 *Agent model: claude-sonnet-4-6*
 *Harness: Claude Code (local)*
+
+---
+
+## March 16-18, 2026 — Debugging Lit Protocol Signing
+
+### Context
+Between March 13 (last working demo) and March 18, Lit Protocol's Chipotle REST API broke the signing flow with undocumented changes. Approved policy verdicts returned `"signing": null` instead of ECDSA signatures. We needed to debug and fix this before the hackathon deadline.
+
+### Problem Discovery
+
+**Symptom:**
+Server logs showed: `WARN callipsos_core::routes::validate: Signing failed (verdict still valid): Internal signing error: Missing 'response' field in Lit result`
+
+Policy engine was fine — all 9 rules passed — but Lit signing silently failed.
+
+### Debugging Process (Together)
+
+We added debug logging to see the raw Chipotle API response:
+```rust
+tracing::debug!("Lit Chipotle raw response: {}", resp_json);
+```
+
+**What we found:** `{"has_error":false,"logs":"","response":{"ok":false,"reason":"Lit Action error: bad digest length ..."}}`
+
+This revealed TWO issues at once:
+1. The `response` field was a JSON object (not a string like before)
+2. The Lit Action itself was failing on digest length
+
+### Root Causes We Identified
+
+**Issue 1: Chipotle response format change**
+- Before: `Lit.Actions.setResponse({ response: JSON.stringify({...}) })` returned `response` as JSON string
+- After: Chipotle now returns `response` as parsed JSON object
+- Our code called `.as_str()` on the field → returned `None` for objects → error
+
+**Issue 2: `signEcdsa` removed from Chipotle runtime**
+- Checked Lit community — confirmed `signEcdsa` no longer exists in Chipotle
+- New pattern: `Lit.Actions.getPrivateKey({ pkpId })` → sign locally with `ethers.SigningKey.signDigest()`
+- Chipotle TEE holds full private key (no threshold MPC in this environment)
+
+**Issue 3: 16-byte digest rejected**
+- Our placeholder tx hash was a UUID (16 bytes): `format!("0x{}", Uuid::new_v4().simple())`
+- `signDigest` requires 32-byte digest → threw "bad digest length"
+
+### Our Fix
+
+**Agent proposed:** Use `keccak256` to hash the UUID for proper 32-byte digest
+**Cyndie implemented:**
+
+1. **`src/signing/lit.rs`** — Rewrote Lit Action code:
+   - Replaced `signEcdsa` with `getPrivateKey` + `ethers.SigningKey.signDigest()`
+   - Fixed response parsing to handle both string and object formats:
+   ```rust
+   let action_response: serde_json::Value = match &resp_json["response"] {
+       serde_json::Value::String(s) => serde_json::from_str(s)?,
+       serde_json::Value::Object(_) => resp_json["response"].clone(),
+       other => return Err(...),
+   };
+   ```
+   - Changed `pkpPublicKey` js_param to `pkpAddress` (getPrivateKey takes wallet address)
+
+2. **`src/routes/validate.rs`** — Fixed tx hash generation:
+   ```rust
+   let raw_id = Uuid::new_v4();
+   let hash = alloy::primitives::keccak256(raw_id.as_bytes());
+   let tx_hash = format!("{hash}");
+   ```
+
+3. **`src/main.rs`** — Renamed env var: `LIT_PKP_PUBLIC_KEY` → `LIT_PKP_ADDRESS`
+
+4. **`.env`** — Updated with new variable name and PKP wallet address
+
+### Verification
+
+✅ Approved transaction now returns valid 65-byte ECDSA signature:
+```json
+{
+  "signing": {
+    "signed": true,
+    "signature": "0x779ea32d...de40f1b",
+    "signer_address": "0x02cde14eb03ed1fe675fe8e690b88b4891d05080",
+    "reason": "Transaction signed by Callipsos-gated PKP"
+  }
+}
+```
+
+✅ Blocked transactions correctly return `"signing": null` (PKP never contacted, as designed)
+
+### Discussion
+
+**Agent:** "The keccak256 approach is solid — it gives us a deterministic 32-byte digest from the UUID, and it's the same hash function Ethereum uses for transaction IDs. Do we want to add a comment in the code explaining why we hash it?"
+
+**Cyndie:** "Yes, let's add context for future maintainers. Also, once we win some bounties from this hackathon, I can upgrade to max plan and we can properly collaborate without token limits!"
+
+**Agent:** "That's the goal! For now, this fix unblocks Phase 3. Signing flow is restored, and we can focus on the chaos agent demo."
+
+### Outcome
+
+- ✅ Signing flow restored after Chipotle API breaking changes
+- ✅ Updated to new Lit Protocol patterns (getPrivateKey, not signEcdsa)
+- ✅ All environment variables updated
+- ✅ End-to-end flow working: policy validation → Lit PKP signing → signed verdict
+- ✅ Ready to build demos with working signing
+
+**Next:** Build chaos agent demo to showcase policy enforcement + signing in action
+
+### Commits
+- [Next commit] — fix(signing): update Lit integration for Chipotle API changes (agent)
+
+---
+
+*Session duration: ~2 days debugging + 30 min review*
+*Agent model: claude-sonnet-4-6*
+*Harness: Claude Code (local)*
+
+
