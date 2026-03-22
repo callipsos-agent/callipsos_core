@@ -1,5 +1,7 @@
-(async () => {
+async function main(params) {
   try {
+    const { verdict, txHash, pkpAddress } = params;
+
     const parsedVerdict = typeof verdict === 'string'
       ? JSON.parse(verdict)
       : verdict;
@@ -27,7 +29,6 @@
       return;
     }
 
-    // Get the PKP's private key inside the TEE
     const privateKey = await Lit.Actions.getPrivateKey({ pkpId: pkpAddress });
     const signingKey = new ethers.utils.SigningKey(privateKey);
     const digestBytes = ethers.utils.arrayify(txHash);
@@ -49,4 +50,4 @@
       }),
     });
   }
-})();
+}
