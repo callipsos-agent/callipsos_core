@@ -25,7 +25,10 @@ rust_decimal_macros = "1.40.0"
 async-trait = "0.1.89"
 colour = "2.1.0"
 schemars = "1.2.1"
-# TODO: Add Teloxide
+aes-gcm = "0.10.3"
+base64 = "0.22.1"
+hex = "0.4.3"
+teloxide = { version = "0.17.0", features = ["macros"] }
 
 
 [dependencies.uuid]
